@@ -1,23 +1,41 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
 
 import User from "../models/User.js";
-import generateToken from "../utils/generateToken.js";
-import sendEmail from "../utils/sendEmail.js";
+
+const generateToken = (id) => {
+  return jwt.sign(
+    {
+      id,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
+};
+
+const createUserResponse = (user) => {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    plan: user.plan,
+    role: user.role,
+  };
+};
 
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        message: "Please provide name, email, and password",
-      });
-    }
+    const existingUser = await User.findOne({
+      email,
+    });
 
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
+    if (existingUser) {
       return res.status(400).json({
         message: "User already exists",
       });
@@ -33,12 +51,8 @@ export const registerUser = async (req, res) => {
 
     res.status(201).json({
       message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
       token: generateToken(user._id),
+      user: createUserResponse(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -51,16 +65,12 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Please provide email and password",
-      });
-    }
-
-    const user = await User.findOne({ email });
+    const user = await User.findOne({
+      email,
+    });
 
     if (!user) {
-      return res.status(400).json({
+      return res.status(401).json({
         message: "Invalid email or password",
       });
     }
@@ -68,19 +78,15 @@ export const loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({
+      return res.status(401).json({
         message: "Invalid email or password",
       });
     }
 
     res.status(200).json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
       token: generateToken(user._id),
+      user: createUserResponse(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -93,17 +99,13 @@ export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({
-        message: "Please provide email",
-      });
-    }
-
-    const user = await User.findOne({ email });
+    const user = await User.findOne({
+      email,
+    });
 
     if (!user) {
       return res.status(404).json({
-        message: "User not found with this email",
+        message: "User not found",
       });
     }
 
@@ -115,32 +117,33 @@ export const forgotPassword = async (req, res) => {
       .digest("hex");
 
     user.resetPasswordToken = hashedResetToken;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    const frontendUrl =
+      process.env.FRONTEND_URL || "http://localhost:5173";
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Password Reset Request</h2>
-        <p>You requested to reset your password for AI Resume Analyzer.</p>
-        <p>Click the button below to reset your password:</p>
-        <a 
-          href="${resetUrl}" 
-          style="display:inline-block; padding:12px 20px; background:#4f46e5; color:#ffffff; text-decoration:none; border-radius:6px;"
-        >
-          Reset Password
-        </a>
-        <p>This link will expire in 15 minutes.</p>
-        <p>If you did not request this, please ignore this email.</p>
-      </div>
-    `;
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-    await sendEmail({
+    const transporter = nodemailer.createTransport({
+      service: process.env.SMTP_SERVICE,
+      auth: {
+        user: process.env.SMTP_MAIL,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_MAIL,
       to: user.email,
-      subject: "AI Resume Analyzer - Reset Your Password",
-      html,
+      subject: "Password Reset Request",
+      html: `
+        <h2>Password Reset</h2>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetUrl}">${resetUrl}</a>
+        <p>This link will expire in 10 minutes.</p>
+      `,
     });
 
     res.status(200).json({
@@ -155,18 +158,11 @@ export const forgotPassword = async (req, res) => {
 
 export const resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
     const { password } = req.body;
-
-    if (!password) {
-      return res.status(400).json({
-        message: "Please provide new password",
-      });
-    }
 
     const hashedResetToken = crypto
       .createHash("sha256")
-      .update(token)
+      .update(req.params.token)
       .digest("hex");
 
     const user = await User.findOne({
@@ -182,9 +178,7 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    user.password = hashedPassword;
+    user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
