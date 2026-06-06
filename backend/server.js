@@ -17,18 +17,29 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ai-resume-analyzer-main-alpha.vercel.app",
+  "https://ai-resume-analyzer-main-cxba7nr8m.vercel.app",
   process.env.FRONTEND_URL,
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("Blocked by CORS:", origin);
-      callback(new Error("Not allowed by CORS"));
+    if (!origin) {
+      return callback(null, true);
     }
+
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      origin.endsWith(".vercel.app");
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+
+    console.log("Blocked by CORS:", origin);
+
+    return callback(new Error("Not allowed by CORS"));
   },
+
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
