@@ -7,43 +7,40 @@ export const createCheckoutSession = async (req, res) => {
   try {
     const { plan } = req.body;
 
-    if (!plan) {
-      return res.status(400).json({
-        message: "Plan is required",
-      });
-    }
-
-    let priceData;
-
-    if (plan === "pro") {
-      priceData = {
-        currency: "usd",
-        product_data: {
-          name: "ResumeAI Pro Plan",
-          description: "20 resume analyses per month",
-        },
-        unit_amount: 1900,
-        recurring: {
-          interval: "month",
-        },
-      };
-    } else if (plan === "enterprise") {
-      priceData = {
-        currency: "usd",
-        product_data: {
-          name: "ResumeAI Enterprise Plan",
-          description: "Unlimited resume analyses",
-        },
-        unit_amount: 7900,
-        recurring: {
-          interval: "month",
-        },
-      };
-    } else {
+    if (!["pro", "enterprise"].includes(plan)) {
       return res.status(400).json({
         message: "Invalid plan selected",
       });
     }
+
+    const priceData =
+      plan === "pro"
+        ? {
+            currency: "usd",
+            product_data: {
+              name: "ResumeAI Pro Plan",
+              description: "20 resume analyses per month",
+            },
+            unit_amount: 1900,
+            recurring: {
+              interval: "month",
+            },
+          }
+        : {
+            currency: "usd",
+            product_data: {
+              name: "ResumeAI Enterprise Plan",
+              description: "Unlimited resume analyses",
+            },
+            unit_amount: 7900,
+            recurring: {
+              interval: "month",
+            },
+          };
+
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      "https://ai-resume-analyzer-main-alpha.vercel.app";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -54,8 +51,8 @@ export const createCheckoutSession = async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.FRONTEND_URL}/payment-success?plan=${plan}`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
+      success_url: `${frontendUrl}/payment-success?plan=${plan}`,
+      cancel_url: `${frontendUrl}/payment-cancel`,
       metadata: {
         userId: req.user._id.toString(),
         plan,
@@ -66,7 +63,7 @@ export const createCheckoutSession = async (req, res) => {
       url: session.url,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Stripe checkout error:", error);
 
     res.status(500).json({
       message: error.message,
@@ -101,6 +98,7 @@ export const updateUserPlan = async (req, res) => {
         name: user.name,
         email: user.email,
         plan: user.plan,
+        role: user.role,
       },
     });
   } catch (error) {

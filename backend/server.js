@@ -17,7 +17,6 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ai-resume-analyzer-main-alpha.vercel.app",
-  "https://ai-resume-analyzer-main-cxba7nr8m.vercel.app",
   process.env.FRONTEND_URL,
 ];
 
@@ -36,17 +35,14 @@ const corsOptions = {
     }
 
     console.log("Blocked by CORS:", origin);
-
     return callback(new Error("Not allowed by CORS"));
   },
-
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
 app.get("/", (req, res) => {
