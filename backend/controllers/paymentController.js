@@ -1,0 +1,111 @@
+import Stripe from "stripe";
+import User from "../models/User.js";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export const createCheckoutSession = async (req, res) => {
+  try {
+    const { plan } = req.body;
+
+    if (!plan) {
+      return res.status(400).json({
+        message: "Plan is required",
+      });
+    }
+
+    let priceData;
+
+    if (plan === "pro") {
+      priceData = {
+        currency: "usd",
+        product_data: {
+          name: "ResumeAI Pro Plan",
+          description: "20 resume analyses per month",
+        },
+        unit_amount: 1900,
+        recurring: {
+          interval: "month",
+        },
+      };
+    } else if (plan === "enterprise") {
+      priceData = {
+        currency: "usd",
+        product_data: {
+          name: "ResumeAI Enterprise Plan",
+          description: "Unlimited resume analyses",
+        },
+        unit_amount: 7900,
+        recurring: {
+          interval: "month",
+        },
+      };
+    } else {
+      return res.status(400).json({
+        message: "Invalid plan selected",
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: priceData,
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.FRONTEND_URL}/payment-success?plan=${plan}`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
+      metadata: {
+        userId: req.user._id.toString(),
+        plan,
+      },
+    });
+
+    res.status(200).json({
+      url: session.url,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+export const updateUserPlan = async (req, res) => {
+  try {
+    const { plan } = req.body;
+
+    if (!["free", "pro", "enterprise"].includes(plan)) {
+      return res.status(400).json({
+        message: "Invalid plan",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        plan,
+      },
+      {
+        new: true,
+      }
+    ).select("-password");
+
+    res.status(200).json({
+      message: "Plan updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};

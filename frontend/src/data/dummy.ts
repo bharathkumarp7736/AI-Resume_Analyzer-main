@@ -1,0 +1,136 @@
+import type { User, ResumeAnalysis } from '../types';
+
+export const dummyUser: User = {
+  id: '1',
+  name: 'Alex Johnson',
+  email: 'alex.johnson@example.com',
+  plan: 'pro',
+  analyzesUsed: 7,
+  analyzesLimit: 20,
+};
+
+export const dummyAnalyses: ResumeAnalysis[] = [
+  {
+    id: '1',
+    fileName: 'alex_johnson_resume.pdf',
+    uploadedAt: '2026-05-28T10:30:00Z',
+    score: 82,
+    jobTitle: 'Senior Frontend Engineer',
+    status: 'completed',
+    atsScore: 78,
+    readabilityScore: 88,
+    impactScore: 80,
+    sections: [
+      {
+        name: 'Contact Information',
+        score: 95,
+        feedback: 'All essential contact details are present and well-formatted.',
+        status: 'good',
+      },
+      {
+        name: 'Work Experience',
+        score: 85,
+        feedback: 'Strong experience section with quantifiable achievements. Consider adding more impact metrics.',
+        status: 'good',
+      },
+      {
+        name: 'Skills',
+        score: 70,
+        feedback: 'Missing some key technologies frequently mentioned in job postings like TypeScript and GraphQL.',
+        status: 'warning',
+      },
+      {
+        name: 'Education',
+        score: 90,
+        feedback: 'Education section is well-structured and relevant.',
+        status: 'good',
+      },
+      {
+        name: 'Summary',
+        score: 60,
+        feedback: 'Your summary lacks specific achievements and measurable impact. Make it more compelling.',
+        status: 'warning',
+      },
+      {
+        name: 'Formatting',
+        score: 88,
+        feedback: 'Clean and professional layout. Ensure consistent font usage throughout.',
+        status: 'good',
+      },
+    ],
+    keywords: [
+      { word: 'React', found: true, importance: 'high' },
+      { word: 'TypeScript', found: false, importance: 'high' },
+      { word: 'Node.js', found: true, importance: 'high' },
+      { word: 'CI/CD', found: true, importance: 'medium' },
+      { word: 'GraphQL', found: false, importance: 'medium' },
+      { word: 'Docker', found: true, importance: 'medium' },
+      { word: 'Agile', found: true, importance: 'low' },
+      { word: 'REST API', found: true, importance: 'high' },
+      { word: 'AWS', found: false, importance: 'medium' },
+      { word: 'Redux', found: true, importance: 'low' },
+    ],
+    suggestions: [
+      {
+        id: 's1',
+        type: 'improvement',
+        title: 'Add TypeScript to Skills',
+        description: 'TypeScript appears in 85% of senior frontend job descriptions. Adding it could significantly improve your match rate.',
+      },
+      {
+        id: 's2',
+        type: 'improvement',
+        title: 'Quantify More Achievements',
+        description: 'Replace vague statements like "improved performance" with specific metrics: "Improved page load time by 40%".',
+      },
+      {
+        id: 's3',
+        type: 'warning',
+        title: 'Rewrite Your Summary',
+        description: 'Your current summary reads like a job description. Focus on your unique value proposition and top 2-3 career highlights.',
+      },
+      {
+        id: 's4',
+        type: 'success',
+        title: 'Strong Work History',
+        description: 'Your work history shows clear progression and relevant experience for this role.',
+      },
+      {
+        id: 's5',
+        type: 'improvement',
+        title: 'Add GraphQL Experience',
+        description: 'GraphQL is mentioned in 60% of similar roles. Even a personal project using it would strengthen your application.',
+      },
+    ],
+  },
+  {
+    id: '2',
+    fileName: 'alex_product_manager.pdf',
+    uploadedAt: '2026-05-20T14:15:00Z',
+    score: 74,
+    jobTitle: 'Product Manager',
+    status: 'completed',
+    atsScore: 71,
+    readabilityScore: 80,
+    impactScore: 72,
+    sections: [],
+    keywords: [],
+    suggestions: [],
+  },
+  {
+    id: '3',
+    fileName: 'alex_fullstack_dev.pdf',
+    uploadedAt: '2026-05-15T09:00:00Z',
+    score: 68,
+    jobTitle: 'Full Stack Developer',
+    status: 'completed',
+    atsScore: 65,
+    readabilityScore: 72,
+    impactScore: 67,
+    sections: [],
+    keywords: [],
+    suggestions: [],
+  },
+];
+
+export const currentAnalysis = dummyAnalyses[0];
