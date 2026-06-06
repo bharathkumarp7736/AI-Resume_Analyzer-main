@@ -12,6 +12,8 @@ import {
   LogOut,
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 type AdminStats = {
   totalUsers: number;
   totalResumes: number;
@@ -53,7 +55,22 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("token");
 
-      const response = await fetch("http://localhost:5000/api/admin/stats", {
+      if (!API_BASE_URL) {
+        throw new Error("VITE_API_BASE_URL is missing");
+      }
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      if (user?.role !== "admin") {
+        alert("Admin access only");
+        navigate("/dashboard");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/admin/stats`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -117,7 +134,9 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium">{user?.name || "Admin"}</p>
-            <p className="text-xs text-gray-500">{user?.email || "admin@example.com"}</p>
+            <p className="text-xs text-gray-500">
+              {user?.email || "admin@example.com"}
+            </p>
           </div>
 
           <button

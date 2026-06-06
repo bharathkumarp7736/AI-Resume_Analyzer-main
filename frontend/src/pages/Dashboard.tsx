@@ -90,6 +90,37 @@ export default function Dashboard() {
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
+  const menuItems = [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      to: "/dashboard",
+      active: true,
+    },
+    {
+      icon: Upload,
+      label: "Upload Resume",
+      to: "/upload",
+      active: false,
+    },
+    ...(user?.role === "admin"
+      ? [
+          {
+            icon: TrendingUp,
+            label: "Admin",
+            to: "/admin",
+            active: false,
+          },
+        ]
+      : []),
+    {
+      icon: Settings,
+      label: "Profile",
+      to: "/profile",
+      active: false,
+    },
+  ];
+
   const fetchHistory = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -131,7 +162,11 @@ export default function Dashboard() {
       } else {
         const fallbackPlan = user?.plan || "free";
         const fallbackLimit =
-          fallbackPlan === "enterprise" ? null : fallbackPlan === "pro" ? 20 : 3;
+          fallbackPlan === "enterprise"
+            ? null
+            : fallbackPlan === "pro"
+            ? 20
+            : 3;
 
         setUsage({
           used: data.resumes?.length || 0,
@@ -159,8 +194,10 @@ export default function Dashboard() {
   const averageScore =
     history.length > 0
       ? Math.round(
-          history.reduce((sum, item) => sum + (item.analysis?.atsScore || 0), 0) /
-            history.length
+          history.reduce(
+            (sum, item) => sum + (item.analysis?.atsScore || 0),
+            0
+          ) / history.length
         )
       : 0;
 
@@ -198,7 +235,10 @@ export default function Dashboard() {
         throw new Error(data.message || "Failed to fetch resume");
       }
 
-      localStorage.setItem("resumeAnalysis", JSON.stringify(data.resume.analysis));
+      localStorage.setItem(
+        "resumeAnalysis",
+        JSON.stringify(data.resume.analysis)
+      );
       localStorage.setItem("resumeId", data.resume._id);
 
       navigate("/result");
@@ -257,12 +297,7 @@ export default function Dashboard() {
         </Link>
 
         <nav className="flex-1 space-y-1">
-          {[
-            { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard", active: true },
-            { icon: Upload, label: "Upload Resume", to: "/upload", active: false },
-            { icon: TrendingUp, label: "Admin", to: "/admin", active: false },
-            { icon: Settings, label: "Profile", to: "/profile", active: false },
-          ].map((item) => (
+          {menuItems.map((item) => (
             <Link
               key={item.label}
               to={item.to}
@@ -336,7 +371,8 @@ export default function Dashboard() {
               {
                 label: "Analyses Used",
                 value: usage.used,
-                sub: usage.limit === null ? "Unlimited plan" : `Limit ${usage.limit}`,
+                sub:
+                  usage.limit === null ? "Unlimited plan" : `Limit ${usage.limit}`,
                 color: "text-sky-400",
               },
               {
@@ -354,7 +390,8 @@ export default function Dashboard() {
               {
                 label: "Plan",
                 value: usage.plan.toUpperCase(),
-                sub: usage.limit === null ? "Unlimited" : `${usage.limit} analyses`,
+                sub:
+                  usage.limit === null ? "Unlimited" : `${usage.limit} analyses`,
                 color: "text-cyan-400",
               },
             ].map((stat) => (
@@ -430,7 +467,9 @@ export default function Dashboard() {
                       <ScoreRing score={score} size={64} />
 
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className={`text-sm font-bold ${scoreColor(score)}`}>
+                        <span
+                          className={`text-sm font-bold ${scoreColor(score)}`}
+                        >
                           {score}
                         </span>
                       </div>
