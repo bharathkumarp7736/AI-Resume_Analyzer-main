@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle, FileText } from "lucide-react";
+import { CheckCircle, FileText, Loader2 } from "lucide-react";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function PaymentSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const [message, setMessage] = useState("Updating your plan...");
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +21,15 @@ export default function PaymentSuccess() {
       const plan = searchParams.get("plan") || "pro";
       const token = localStorage.getItem("token");
 
-      const response = await fetch("http://localhost:5000/api/payment/update-plan", {
+      if (!API_BASE_URL) {
+        throw new Error("VITE_API_BASE_URL is missing");
+      }
+
+      if (!token) {
+        throw new Error("Login token missing. Please login again.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/payment/update-plan`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -34,9 +45,15 @@ export default function PaymentSuccess() {
       }
 
       localStorage.setItem("user", JSON.stringify(data.user));
+
       setMessage(`Your plan has been upgraded to ${plan.toUpperCase()} successfully.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Payment successful, but plan update failed.");
+      console.error(error);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Payment successful, but plan update failed."
+      );
     } finally {
       setLoading(false);
     }
@@ -50,7 +67,11 @@ export default function PaymentSuccess() {
         className="max-w-md w-full bg-gray-900 border border-white/5 rounded-2xl p-8 text-center"
       >
         <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-5">
-          <CheckCircle size={36} className="text-emerald-400" />
+          {loading ? (
+            <Loader2 size={36} className="text-emerald-400 animate-spin" />
+          ) : (
+            <CheckCircle size={36} className="text-emerald-400" />
+          )}
         </div>
 
         <h1 className="text-3xl font-bold mb-3">Payment Successful</h1>
@@ -59,18 +80,18 @@ export default function PaymentSuccess() {
 
         <div className="flex flex-col gap-3">
           <Link
-            to="/dashboard"
+            to="/profile"
             className="bg-sky-500 hover:bg-sky-400 text-white px-5 py-3 rounded-xl font-semibold transition-all"
           >
-            Go to Dashboard
+            View Profile
           </Link>
 
           <button
-            onClick={() => navigate("/upload")}
+            onClick={() => navigate("/dashboard")}
             disabled={loading}
             className="border border-white/10 hover:bg-white/5 text-gray-300 px-5 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
           >
-            Analyze Resume
+            Go to Dashboard
           </button>
         </div>
 

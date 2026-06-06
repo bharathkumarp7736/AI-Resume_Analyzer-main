@@ -94,12 +94,12 @@ export const updateUserPlan = async (req, res) => {
     res.status(200).json({
       message: "Plan updated successfully",
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-        role: user.role,
-      },
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  plan: user.plan,
+  role: user.role,
+},
     });
   } catch (error) {
     res.status(500).json({
