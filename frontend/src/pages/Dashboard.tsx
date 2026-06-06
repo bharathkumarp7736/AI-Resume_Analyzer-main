@@ -15,6 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 type ResumeHistoryItem = {
   _id: string;
   fileName: string;
@@ -23,6 +25,12 @@ type ResumeHistoryItem = {
     atsScore: number;
     summary: string;
   };
+};
+
+type Usage = {
+  used: number;
+  limit: number | null;
+  plan: string;
 };
 
 const scoreColor = (score: number) => {
@@ -73,6 +81,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const [history, setHistory] = useState<ResumeHistoryItem[]>([]);
+  const [usage, setUsage] = useState<Usage>({
+    used: 0,
+    limit: 3,
+    plan: "free",
+  });
   const [loading, setLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -81,7 +94,16 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
 
-      const response = await fetch("http://localhost:5000/api/resume/history", {
+      if (!API_BASE_URL) {
+        throw new Error("VITE_API_BASE_URL is missing");
+      }
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/resume/history`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -94,6 +116,29 @@ export default function Dashboard() {
       }
 
       setHistory(data.resumes || []);
+
+      if (data.usage) {
+        setUsage({
+          used: data.usage.used || 0,
+          limit:
+            data.usage.limit === null ||
+            data.usage.limit === "Infinity" ||
+            data.usage.limit === Infinity
+              ? null
+              : data.usage.limit,
+          plan: data.usage.plan || user?.plan || "free",
+        });
+      } else {
+        const fallbackPlan = user?.plan || "free";
+        const fallbackLimit =
+          fallbackPlan === "enterprise" ? null : fallbackPlan === "pro" ? 20 : 3;
+
+        setUsage({
+          used: data.resumes?.length || 0,
+          limit: fallbackLimit,
+          plan: fallbackPlan,
+        });
+      }
     } catch (error) {
       console.error(error);
       setHistory([]);
@@ -106,8 +151,6 @@ export default function Dashboard() {
     fetchHistory();
   }, []);
 
-  const totalAnalyses = history.length;
-
   const bestScore =
     history.length > 0
       ? Math.max(...history.map((item) => item.analysis?.atsScore || 0))
@@ -116,12 +159,20 @@ export default function Dashboard() {
   const averageScore =
     history.length > 0
       ? Math.round(
-        history.reduce(
-          (sum, item) => sum + (item.analysis?.atsScore || 0),
-          0
-        ) / history.length
-      )
+          history.reduce((sum, item) => sum + (item.analysis?.atsScore || 0), 0) /
+            history.length
+        )
       : 0;
+
+  const usagePercent =
+    usage.limit === null
+      ? 100
+      : Math.min((usage.used / usage.limit) * 100, 100);
+
+  const usageText =
+    usage.limit === null
+      ? `${usage.used} used / Unlimited`
+      : `${usage.used} of ${usage.limit} used`;
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -135,7 +186,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
 
-      const response = await fetch(`http://localhost:5000/api/resume/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/resume/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -147,10 +198,7 @@ export default function Dashboard() {
         throw new Error(data.message || "Failed to fetch resume");
       }
 
-      localStorage.setItem(
-        "resumeAnalysis",
-        JSON.stringify(data.resume.analysis)
-      );
+      localStorage.setItem("resumeAnalysis", JSON.stringify(data.resume.analysis));
       localStorage.setItem("resumeId", data.resume._id);
 
       navigate("/result");
@@ -170,7 +218,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
 
-      const response = await fetch(`http://localhost:5000/api/resume/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/resume/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -183,14 +231,7 @@ export default function Dashboard() {
         throw new Error(data.message || "Failed to delete resume");
       }
 
-      setHistory((prev) => prev.filter((item) => item._id !== id));
-
-      const currentResumeId = localStorage.getItem("resumeId");
-
-      if (currentResumeId === id) {
-        localStorage.removeItem("resumeAnalysis");
-        localStorage.removeItem("resumeId");
-      }
+      await fetchHistory();
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : "Failed to delete resume");
@@ -217,38 +258,19 @@ export default function Dashboard() {
 
         <nav className="flex-1 space-y-1">
           {[
-            {
-              icon: LayoutDashboard,
-              label: "Dashboard",
-              to: "/dashboard",
-              active: true,
-            },
-            {
-              icon: Upload,
-              label: "Upload Resume",
-              to: "/upload",
-              active: false,
-            },
-            {
-              icon: TrendingUp,
-              label: "History",
-              to: "/dashboard",
-              active: false,
-            },
-            {
-              icon: Settings,
-              label: "Profile",
-              to: "/profile",
-              active: false,
-            },
+            { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard", active: true },
+            { icon: Upload, label: "Upload Resume", to: "/upload", active: false },
+            { icon: TrendingUp, label: "Admin", to: "/admin", active: false },
+            { icon: Settings, label: "Profile", to: "/profile", active: false },
           ].map((item) => (
             <Link
               key={item.label}
               to={item.to}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${item.active
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                item.active
                   ? "bg-sky-500/15 text-sky-400"
                   : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
+              }`}
             >
               <item.icon size={17} />
               {item.label}
@@ -308,14 +330,13 @@ export default function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
             className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
           >
             {[
               {
-                label: "Total Analyses",
-                value: totalAnalyses,
-                sub: "Saved resumes",
+                label: "Analyses Used",
+                value: usage.used,
+                sub: usage.limit === null ? "Unlimited plan" : `Limit ${usage.limit}`,
                 color: "text-sky-400",
               },
               {
@@ -332,8 +353,8 @@ export default function Dashboard() {
               },
               {
                 label: "Plan",
-                value: "Free",
-                sub: "3 analyses/month",
+                value: usage.plan.toUpperCase(),
+                sub: usage.limit === null ? "Unlimited" : `${usage.limit} analyses`,
                 color: "text-cyan-400",
               },
             ].map((stat) => (
@@ -350,173 +371,119 @@ export default function Dashboard() {
             ))}
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-gray-900 border border-white/5 rounded-2xl p-5 mb-8"
-          >
+          <div className="bg-gray-900 border border-white/5 rounded-2xl p-5 mb-8">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">Monthly Analyses</span>
-              <span className="text-sm text-gray-400">
-                {totalAnalyses} of 3 used
-              </span>
+              <span className="text-sm text-gray-400">{usageText}</span>
             </div>
 
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{
-                  width: `${Math.min((totalAnalyses / 3) * 100, 100)}%`,
-                }}
-                transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+                animate={{ width: `${usagePercent}%` }}
+                transition={{ duration: 0.8 }}
                 className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 rounded-full"
               />
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Recent Analyses</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Recent Analyses</h2>
+            <button
+              onClick={fetchHistory}
+              className="text-sm text-sky-400 hover:text-sky-300"
+            >
+              Refresh
+            </button>
+          </div>
 
-              <button
-                onClick={fetchHistory}
-                className="text-sm text-sky-400 hover:text-sky-300 transition-colors"
+          {history.length === 0 ? (
+            <div className="bg-gray-900 border border-white/5 rounded-2xl p-8 text-center">
+              <p className="font-semibold mb-2">No resume analyses yet</p>
+              <p className="text-sm text-gray-400 mb-5">
+                Upload your first resume to get AI-powered feedback.
+              </p>
+
+              <Link
+                to="/upload"
+                className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
               >
-                Refresh
-              </button>
+                <Upload size={15} />
+                Upload Resume
+              </Link>
             </div>
+          ) : (
+            <div className="space-y-3">
+              {history.map((item, i) => {
+                const score = item.analysis?.atsScore || 0;
 
-            {history.length === 0 ? (
-              <div className="bg-gray-900 border border-white/5 rounded-2xl p-8 text-center">
-                <p className="font-semibold mb-2">No resume analyses yet</p>
-                <p className="text-sm text-gray-400 mb-5">
-                  Upload your first resume to get AI-powered feedback.
-                </p>
+                return (
+                  <motion.div
+                    key={item._id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="bg-gray-900 border border-white/5 rounded-2xl p-5 flex items-center gap-5 hover:border-sky-500/20 transition-all group cursor-pointer"
+                    onClick={() => openAnalysis(item._id)}
+                  >
+                    <div className="relative shrink-0">
+                      <ScoreRing score={score} size={64} />
 
-                <Link
-                  to="/upload"
-                  className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
-                >
-                  <Upload size={15} />
-                  Upload Resume
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {history.map((item, i) => {
-                  const score = item.analysis?.atsScore || 0;
-
-                  return (
-                    <motion.div
-                      key={item._id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 + i * 0.08 }}
-                      className="bg-gray-900 border border-white/5 rounded-2xl p-5 flex items-center gap-5 hover:border-sky-500/20 transition-all group cursor-pointer"
-                      onClick={() => openAnalysis(item._id)}
-                    >
-                      <div className="relative shrink-0">
-                        <ScoreRing score={score} size={64} />
-
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span
-                            className={`text-sm font-bold ${scoreColor(score)}`}
-                          >
-                            {score}
-                          </span>
-                        </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-sm font-bold ${scoreColor(score)}`}>
+                          {score}
+                        </span>
                       </div>
+                    </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="font-medium text-sm truncate">
-                            {item.fileName}
-                          </p>
-
-                          <span className="shrink-0 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
-                            <CheckCircle size={10} />
-                            completed
-                          </span>
-                        </div>
-
-                        <p className="text-sm text-gray-400 line-clamp-2">
-                          {item.analysis?.summary || "No summary available"}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-medium text-sm truncate">
+                          {item.fileName}
                         </p>
 
-                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-600">
-                          <Clock size={11} />
-                          {new Date(item.createdAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )}
-                        </div>
+                        <span className="shrink-0 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
+                          <CheckCircle size={10} />
+                          completed
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-4 shrink-0">
-                        <div className="hidden md:flex gap-4 text-xs text-gray-400">
-                          <div className="text-center">
-                            <div className="font-semibold text-white">
-                              {score}
-                            </div>
-                            <div>ATS</div>
-                          </div>
-                        </div>
+                      <p className="text-sm text-gray-400 line-clamp-2">
+                        {item.analysis?.summary || "No summary available"}
+                      </p>
 
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            deleteResume(item._id);
-                          }}
-                          className="flex items-center gap-1.5 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 px-3 py-2 rounded-lg transition-all"
-                        >
-                          <Trash2 size={13} />
-                          Delete
-                        </button>
-
-                        <ChevronRight
-                          size={18}
-                          className="text-gray-600 group-hover:text-sky-400 transition-colors"
-                        />
+                      <div className="flex items-center gap-1 mt-1 text-xs text-gray-600">
+                        <Clock size={11} />
+                        {new Date(item.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
+                    </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 bg-gradient-to-r from-sky-500/10 to-cyan-500/5 border border-sky-500/15 rounded-2xl p-6 flex items-center justify-between gap-4"
-          >
-            <div>
-              <p className="font-semibold mb-1">
-                Ready to improve your resume?
-              </p>
-              <p className="text-sm text-gray-400">
-                Upload a new resume to get instant AI-powered feedback.
-              </p>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteResume(item._id);
+                        }}
+                        className="flex items-center gap-1.5 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 px-3 py-2 rounded-lg transition-all"
+                      >
+                        <Trash2 size={13} />
+                        Delete
+                      </button>
+
+                      <ChevronRight
+                        size={18}
+                        className="text-gray-600 group-hover:text-sky-400 transition-colors"
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-
-            <Link
-              to="/upload"
-              className="shrink-0 flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
-            >
-              <Upload size={15} />
-              Upload Resume
-            </Link>
-          </motion.div>
+          )}
         </div>
       </main>
     </div>
