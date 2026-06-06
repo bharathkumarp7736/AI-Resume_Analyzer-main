@@ -1,56 +1,63 @@
-import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-dotenv.config();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const apiKey = process.env.GEMINI_API_KEY;
+const parseJsonSafely = (text) => {
+  const cleaned = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-console.log("Loaded Gemini Key:", apiKey ? "Key found" : "undefined");
-
-const genAI = new GoogleGenerativeAI(apiKey);
+  return JSON.parse(cleaned);
+};
 
 export const analyzeResumeWithAI = async (resumeText) => {
-  try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-    });
+  const prompt = `
+Analyze this resume and return ONLY valid JSON.
 
-    const prompt = `
-You are an expert ATS resume analyzer.
-
-Analyze this resume for a fresher software developer role.
-
-Return only valid JSON. Do not use markdown.
-
-JSON format:
-{
-  "atsScore": 85,
-  "summary": "Short summary",
-  "strongPoints": ["point 1", "point 2"],
-  "weakPoints": ["point 1", "point 2"],
-  "missingSkills": ["skill 1", "skill 2"],
-  "resumeMistakes": ["mistake 1", "mistake 2"],
-  "projectImprovements": ["improvement 1", "improvement 2"],
-  "suggestedRoles": ["role 1", "role 2"],
-  "interviewQuestions": ["question 1", "question 2"]
-}
-
-Resume text:
+Resume:
 ${resumeText}
+
+Return JSON with:
+{
+  "atsScore": number,
+  "summary": string,
+  "strongPoints": string[],
+  "weakPoints": string[],
+  "missingSkills": string[],
+  "resumeMistakes": string[],
+  "projectImprovements": string[],
+  "suggestedRoles": string[],
+  "interviewQuestions": string[]
+}
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+  const models = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-2.5-flash"
+  ];
 
-    const cleanedText = text
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+  let lastError;
 
-    return JSON.parse(cleanedText);
-  } catch (error) {
-    console.error("Gemini Full Error:", error);
-    throw new Error(error.message);
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      return parseJsonSafely(text);
+    } catch (error) {
+      console.error(`Gemini failed with ${modelName}:`, error.message);
+      lastError = error;
+    }
   }
+
+  throw new Error(
+    lastError?.message || "All Gemini models failed. Please try again later."
+  );
 };
