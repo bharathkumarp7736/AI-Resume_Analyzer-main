@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { motion, type Variants } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FileText,
   Zap,
@@ -128,66 +128,82 @@ const plans = [
   },
 ];
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
+const fadeUp: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+  },
+  visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
     transition: {
       duration: 0.5,
       delay: i * 0.1,
-      ease: "easeOut",
+      ease: [0.16, 1, 0.3, 1],
     },
   }),
 };
 
 export default function Landing() {
-const handlePlanClick = async (planName: string) => {
-  try {
-    if (planName === "Free") {
-      window.location.href = "/register";
-      return;
-    }
+  const navigate = useNavigate();
 
-    const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "null");
 
-    if (!token) {
-      window.location.href = "/login";
-      return;
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("resumeAnalysis");
+    localStorage.removeItem("resumeId");
+    navigate("/");
+  };
 
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-    if (!API_BASE_URL) {
-      throw new Error("VITE_API_BASE_URL is missing");
-    }
-
-    const response = await fetch(
-      `${API_BASE_URL}/payment/create-checkout-session`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          plan: planName.toLowerCase(),
-        }),
+  const handlePlanClick = async (planName: string) => {
+    try {
+      if (planName === "Free") {
+        window.location.href = token ? "/dashboard" : "/register";
+        return;
       }
-    );
 
-    const data = await response.json();
+      const savedToken = localStorage.getItem("token");
 
-    if (!response.ok) {
-      throw new Error(data.message || "Payment failed");
+      if (!savedToken) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+      if (!API_BASE_URL) {
+        throw new Error("VITE_API_BASE_URL is missing");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/payment/create-checkout-session`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${savedToken}`,
+          },
+          body: JSON.stringify({
+            plan: planName.toLowerCase(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Payment failed");
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Payment failed");
     }
-
-    window.location.href = data.url;
-  } catch (error) {
-    console.error(error);
-    alert(error instanceof Error ? error.message : "Payment failed");
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -204,10 +220,7 @@ const handlePlanClick = async (planName: string) => {
             <a href="#features" className="hover:text-white transition-colors">
               Features
             </a>
-            <a
-              href="#testimonials"
-              className="hover:text-white transition-colors"
-            >
+            <a href="#testimonials" className="hover:text-white transition-colors">
               Reviews
             </a>
             <a href="#pricing" className="hover:text-white transition-colors">
@@ -216,19 +229,43 @@ const handlePlanClick = async (planName: string) => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-sm text-gray-400 hover:text-white transition-colors px-4 py-2"
-            >
-              Sign In
-            </Link>
+            {token ? (
+              <>
+                <span className="text-sm text-gray-400 hidden sm:block">
+                  Hi, {user?.name || "User"}
+                </span>
 
-            <Link
-              to="/register"
-              className="text-sm bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Get Started
-            </Link>
+                <Link
+                  to="/dashboard"
+                  className="text-sm bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-gray-400 hover:text-white transition-colors px-4 py-2"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm text-gray-400 hover:text-white transition-colors px-4 py-2"
+                >
+                  Sign In
+                </Link>
+
+                <Link
+                  to="/register"
+                  className="text-sm bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -278,23 +315,38 @@ const handlePlanClick = async (planName: string) => {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link
-              to="/register"
-              className="group flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-sky-500/25"
-            >
-              Analyze Your Resume Free
-              <ArrowRight
-                size={20}
-                className="group-hover:translate-x-1 transition-transform"
-              />
-            </Link>
+            {token ? (
+              <Link
+                to="/dashboard"
+                className="group flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-sky-500/25"
+              >
+                Go to Dashboard
+                <ArrowRight
+                  size={20}
+                  className="group-hover:translate-x-1 transition-transform"
+                />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/register"
+                  className="group flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-sky-500/25"
+                >
+                  Analyze Your Resume Free
+                  <ArrowRight
+                    size={20}
+                    className="group-hover:translate-x-1 transition-transform"
+                  />
+                </Link>
 
-            <Link
-              to="/login"
-              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all"
-            >
-              Sign In
-            </Link>
+                <Link
+                  to="/login"
+                  className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all"
+                >
+                  Sign In
+                </Link>
+              </>
+            )}
           </motion.div>
 
           <motion.p
@@ -367,9 +419,7 @@ const handlePlanClick = async (planName: string) => {
                 <div className="w-12 h-12 bg-sky-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-sky-500/20 transition-colors">
                   <feature.icon size={22} className="text-sky-400" />
                 </div>
-                <h3 className="font-semibold text-lg mb-2">
-                  {feature.title}
-                </h3>
+                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">
                   {feature.description}
                 </p>
@@ -546,10 +596,10 @@ const handlePlanClick = async (planName: string) => {
           </p>
 
           <Link
-            to="/register"
+            to={token ? "/dashboard" : "/register"}
             className="group inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-10 py-4 rounded-xl font-semibold text-lg transition-all hover:shadow-xl hover:shadow-sky-500/30"
           >
-            Start Analyzing for Free
+            {token ? "Go to Dashboard" : "Start Analyzing for Free"}
             <ArrowRight
               size={20}
               className="group-hover:translate-x-1 transition-transform"

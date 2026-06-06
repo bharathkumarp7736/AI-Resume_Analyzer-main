@@ -46,7 +46,9 @@ export default function PaymentSuccess() {
 
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      setMessage(`Your plan has been upgraded to ${plan.toUpperCase()} successfully.`);
+      setMessage(
+        `Your plan has been upgraded to ${plan.toUpperCase()} successfully.`
+      );
     } catch (error) {
       console.error(error);
       setMessage(
