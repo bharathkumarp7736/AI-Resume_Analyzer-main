@@ -142,46 +142,52 @@ const fadeUp = {
 };
 
 export default function Landing() {
-  const handlePlanClick = async (planName: string) => {
-    try {
-      if (planName === "Free") {
-        window.location.href = "/register";
-        return;
-      }
-
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5000/api/payment/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            plan: planName.toLowerCase(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Payment failed");
-      }
-
-      window.location.href = data.url;
-    } catch (error) {
-      console.error(error);
-      alert(error instanceof Error ? error.message : "Payment failed");
+const handlePlanClick = async (planName: string) => {
+  try {
+    if (planName === "Free") {
+      window.location.href = "/register";
+      return;
     }
-  };
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+    if (!API_BASE_URL) {
+      throw new Error("VITE_API_BASE_URL is missing");
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/payment/create-checkout-session`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan: planName.toLowerCase(),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Payment failed");
+    }
+
+    window.location.href = data.url;
+  } catch (error) {
+    console.error(error);
+    alert(error instanceof Error ? error.message : "Payment failed");
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
